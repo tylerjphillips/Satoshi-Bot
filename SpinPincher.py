@@ -33,6 +33,9 @@ current_balance = 0 # amount of balance
 # Replace this URL with the unique one they give you
 webzone = 'https://faucetgame.com'
 
+# profit logfile
+profit_fname = 'profits.txt'
+
 while countdown > 0:
 
     # initialize driver
