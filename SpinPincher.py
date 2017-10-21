@@ -6,6 +6,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 import time  # used for sleeping
 import datetime
 import random
+import re
 
 # mute the driver in driver options
 chrome_options = webdriver.ChromeOptions()
@@ -16,14 +17,16 @@ chrome_options.add_argument("--mute-audio")
 chrome_options.add_extension('uBlock-Origin_v1.14.12.crx')
 
 # used for keeping track of time
-countdown = 3600*24  # 24 hours. Will end when time runs to 0
+countdown = 3600*48  # 24 hours. Will end when time runs to 0
 countdown_start = countdown
-hour_time = 3550 #3600 # counts up to an hour to give reports
-hour_count = -1
+
+running_time = 0 # time in seconds that the bot has run
+schedules = (3600,1820)  # determines next time to schedule bot operation
+rates = (3600,1820)  # determines rate of bot operations
+hour_count = 0
 
 # increase this amount when you rank up
-bet_amount = 0; # how many times to up the bet
-bet_current = bet_amount
+bet_current = 0;
 
 current_balance = 0 # amount of balance
 
@@ -42,10 +45,9 @@ while countdown > 0:
         download_throughput=60 * 1024,  # maximal throughput
         upload_throughput=30 * 1024)  # maximal throughput
 
-    bet_current = bet_amount #reset the bet
-
     #Go to webzone.
     driver.get(webzone)
+    driver.maximize_window()
     time.sleep(2)
 
     # click on wheel of winnings link
@@ -53,10 +55,20 @@ while countdown > 0:
     driver.find_element_by_xpath(xp).click()
     time.sleep(5)
 
+    # get balance
+    if current_balance == 0:
+        xp = '//a[@href="/account"]/span[@class="userCredits"]'
+        current_balance = int(driver.find_element_by_xpath(xp).text)
+
+    # get bet amount
+    webelements = driver.find_elements_by_class_name('mt5')
+    bet_current = webelements[-1].text
+    bet_current = int(re.sub("\D", "", bet_current)) - 1
+
     while countdown > 0:
         # close ads if found
         if (len(driver.window_handles) > 1):
-            print('ad detected; closing')
+            print('\tad detected; closing')
             driver.switch_to.window(driver.window_handles[1])
             driver.close()
             driver.switch_to.window(driver.window_handles[0])
@@ -68,46 +80,45 @@ while countdown > 0:
                 button[0].click()
             except:
                 driver.quit()
-                print("captcha? Closing and restarting")
+                print("\tcaptcha? Closing and restarting")
                 time.sleep(30)
                 break
 
         else:
-            print("nothing there")
+            print("\tnothing there")
 
 
         # wait for the spinner to turn, plus a random delay
         fuzz = random.randint(0, 3)  # fuzz the re-presses up a bit
         time.sleep(8+fuzz)
         countdown -= 8+fuzz
-        hour_time += 8+fuzz
+        running_time += 8+fuzz
 
-
-        if(hour_time >= 3600):
+        if running_time >= schedules[0]:
             # print hourly income
-            hour_time = 0
+            schedules[0] += rates[0] # update next schedule
             hour_count += 1
             print("it's been an hour; ", hour_count, " operational")
-            driver.get('https://faucetgame.com/account')
-            time.sleep(5)
 
-            xp = '/html/body/div[1]/div[2]/div/div/header/div[1]/div[2]/div/div/div[2]/h5'
-            account = driver.find_elements_by_class_name('mt5')
+            # obtain and print current balance
+            print(driver.find_element_by_xpath('//a[@href="/account"]/span[@class="userCredits"]').text)
+            new_balance = int(driver.find_element_by_xpath('//a[@href="/account"]/span[@class="userCredits"]').text)
 
-            new_balance = int(account[0].text)
-            print("profit = ",new_balance - current_balance)
+            # calculate and print profit
+            profit = new_balance - current_balance
+            print("profit = ",profit)
+
+            # write to log file
+            profit_logfile = open(profit_fname, "a")
+            profit_logfile.write(str(time.ctime(time.time()))+",\t"+str(new_balance)+",\t"+str(profit)+'\n')
+            profit_logfile.close()
+
+            #update current balance
             current_balance = new_balance
-
-            driver.get('https://faucetgame.com/wheel')
-            time.sleep(2)
-            # new_balance = int(driver.find_element_by_xpath(xp).text)  # amount of balance
-            # print("current balance: ", new_balance)
-            # print("profit: ",new_balance - current_balance)
-            # current_balance = new_balance
 
         # close ads if found
         if (len(driver.window_handles) > 1):
-            print('ad detected; closing')
+            print('\tad detected; closing')
             driver.switch_to.window(driver.window_handles[1])
             driver.close()
             driver.switch_to.window(driver.window_handles[0])
@@ -115,22 +126,26 @@ while countdown > 0:
 
         if bet_current > 0:
             time.sleep(2)
-            print('upping bet')
+            print('\tupping bet')
             # click up the bet
             xp = '//*[@id="betSpinUp"]'
             driver.find_element_by_xpath(xp).click()# increase bet
             bet_current -= 1
 
         # every now and then, wait a few minutes
-        if(random.randint(0,200)) == 0:
+        if(random.randint(0,100)) == 0:
             fuzz = random.randint(60,180)
-            print("sleeping for ",fuzz," seconds...")
+            print("\tsleeping for ",fuzz," seconds...")
             time.sleep(fuzz)
 
+
+
         # every once in a while wait a couple hours
-        if (random.randint(0, 1000)) == 0:
-            fuzz = random.randint(3600, 3600*5) # 1-5 hours
-            print("Taking break for ", fuzz, " seconds...")
+        if (random.randint(0, 1500)) == 0:
+            fuzz = random.randint(3600*.5, 3600*2) # 1-2 hours
+            if (random.randint(0, 3)) == 0:
+                fuzz += random.uniform(3600* 5, 3600*7) # 1-2 hours
+            print("Taking break for ", fuzz / 3600, " hours...")
             driver.quit()
             time.sleep(fuzz)
             print("Resuming")
