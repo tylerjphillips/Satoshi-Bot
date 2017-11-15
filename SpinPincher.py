@@ -1,6 +1,4 @@
-import urllib
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 import time  # used for sleeping
@@ -21,8 +19,8 @@ countdown = 3600*48  # 24 hours. Will end when time runs to 0
 countdown_start = countdown
 
 running_time = 0 # time in seconds that the bot has run
-schedules = (3600,1820)  # determines next time to schedule bot operation
-rates = (3600,1820)  # determines rate of bot operations
+schedules = [3600,1820]  # determines next time to schedule bot operation
+rates = [3600,1820]  # determines rate of bot operations
 hour_count = 0
 
 # increase this amount when you rank up
@@ -30,128 +28,158 @@ bet_current = 0;
 
 current_balance = 0 # amount of balance
 
-# Replace this URL with the unique one they give you
+# Replace this URL with the unique one they give you if using temp account
 webzone = 'https://faucetgame.com'
+
+# if you have an account set to true
+login = False
+username = 'username'
+email = 'email@email'
+password = '12345'
+if login == True:
+    webzone = 'https://faucetgame.com/login'
+
 
 # profit logfile
 profit_fname = 'profits.txt'
 
 while countdown > 0:
+    try:
+        while countdown > 0:
 
-    # initialize driver
-    driver= webdriver.Chrome(chrome_options=chrome_options)
+            # initialize driver
+            driver= webdriver.Chrome(chrome_options=chrome_options)
 
-    # Throttles network just in case
-    driver.set_network_conditions(
-        offline=False,
-        latency=0,  # additional latency (ms)
-        download_throughput=60 * 1024,  # maximal throughput
-        upload_throughput=30 * 1024)  # maximal throughput
+            # Throttles network just in case
+            driver.set_network_conditions(
+                offline=False,
+                latency=0,  # additional latency (ms)
+                download_throughput=60 * 1024,  # maximal throughput
+                upload_throughput=30 * 1024)  # maximal throughput
 
-    #Go to webzone.
-    driver.get(webzone)
-    driver.maximize_window()
-    time.sleep(2)
+            #Go to webzone.
+            driver.get(webzone)
 
-    # click on wheel of winnings link
-    xp = "//a[@href='/wheel']"
-    driver.find_element_by_xpath(xp).click()
-    time.sleep(5)
-
-    # get balance
-    if current_balance == 0:
-        xp = '//a[@href="/account"]/span[@class="userCredits"]'
-        current_balance = int(driver.find_element_by_xpath(xp).text)
-
-    # get bet amount
-    webelements = driver.find_elements_by_class_name('mt5')
-    bet_current = webelements[-1].text
-    bet_current = int(re.sub("\D", "", bet_current)) - 1
-
-    while countdown > 0:
-        # close ads if found
-        if (len(driver.window_handles) > 1):
-            print('\tad detected; closing')
-            driver.switch_to.window(driver.window_handles[1])
-            driver.close()
-            driver.switch_to.window(driver.window_handles[0])
+            if login:
+                # get the input elements for login form
+                inputElements = driver.find_elements_by_tag_name('input')
+                # force the form to be visible
+                driver.execute_script("arguments[0].click();", inputElements[1])
+                # enter login credentials
+                inputElements[1].send_keys(username)
+                inputElements[2].send_keys(email)
+                inputElements[3].send_keys(password+Keys.ENTER)
 
 
-        button = driver.find_elements_by_class_name('spinButton')
-        if len(button) == 1:
-            try:
-                button[0].click()
-            except:
-                driver.quit()
-                print("\tcaptcha? Closing and restarting")
-                time.sleep(30)
-                break
-
-        else:
-            print("\tnothing there")
-
-
-        # wait for the spinner to turn, plus a random delay
-        fuzz = random.randint(0, 3)  # fuzz the re-presses up a bit
-        time.sleep(8+fuzz)
-        countdown -= 8+fuzz
-        running_time += 8+fuzz
-
-        if running_time >= schedules[0]:
-            # print hourly income
-            schedules[0] += rates[0] # update next schedule
-            hour_count += 1
-            print("it's been an hour; ", hour_count, " operational")
-
-            # obtain and print current balance
-            print(driver.find_element_by_xpath('//a[@href="/account"]/span[@class="userCredits"]').text)
-            new_balance = int(driver.find_element_by_xpath('//a[@href="/account"]/span[@class="userCredits"]').text)
-
-            # calculate and print profit
-            profit = new_balance - current_balance
-            print("profit = ",profit)
-
-            # write to log file
-            profit_logfile = open(profit_fname, "a")
-            profit_logfile.write(str(time.ctime(time.time()))+",\t"+str(new_balance)+",\t"+str(profit)+'\n')
-            profit_logfile.close()
-
-            #update current balance
-            current_balance = new_balance
-
-        # close ads if found
-        if (len(driver.window_handles) > 1):
-            print('\tad detected; closing')
-            driver.switch_to.window(driver.window_handles[1])
-            driver.close()
-            driver.switch_to.window(driver.window_handles[0])
-
-
-        if bet_current > 0:
             time.sleep(2)
-            print('\tupping bet')
-            # click up the bet
-            xp = '//*[@id="betSpinUp"]'
-            driver.find_element_by_xpath(xp).click()# increase bet
-            bet_current -= 1
+            driver.maximize_window()
+            time.sleep(2)
 
-        # every now and then, wait a few minutes
-        if(random.randint(0,100)) == 0:
-            fuzz = random.randint(60,180)
-            print("\tsleeping for ",fuzz," seconds...")
-            time.sleep(fuzz)
+            # click on wheel of winnings link
+            xp = "//a[@href='/wheel']"
+            driver.find_element_by_xpath(xp).click()
+            time.sleep(5)
+
+            # get balance
+            if current_balance == 0:
+                xp = '//a[@href="/account"]/span[@class="userCredits"]'
+                current_balance = int(driver.find_element_by_xpath(xp).text)
+
+            # get bet amount
+            webelements = driver.find_elements_by_class_name('mt5')
+            bet_current = webelements[-1].text
+            bet_current = int(re.sub("\D", "", bet_current)) - 1
+
+            while countdown > 0:
+                # close ads if found
+                if (len(driver.window_handles) > 1):
+                    print('\tad detected; closing')
+                    driver.switch_to.window(driver.window_handles[1])
+                    driver.close()
+                    driver.switch_to.window(driver.window_handles[0])
+
+
+                button = driver.find_elements_by_class_name('spinButton')
+                if len(button) == 1:
+                    try:
+                        button[0].click()
+                    except:
+                        driver.quit()
+                        print("\tcaptcha? Closing and restarting")
+                        time.sleep(30)
+                        break
+
+                else:
+                    print("\tnothing there")
+
+
+                # wait for the spinner to turn, plus a random delay
+                fuzz = random.randint(0, 3)  # fuzz the re-presses up a bit
+                time.sleep(8+fuzz)
+                countdown -= 8+fuzz
+                running_time += 8+fuzz
+
+                if running_time >= schedules[0]:
+                    # print hourly income
+                    schedules[0] += rates[0] # update next schedule
+                    hour_count += 1
+                    print("it's been an hour; ", hour_count, " operational")
+
+                    # obtain and print current balance
+                    print(driver.find_element_by_xpath('//a[@href="/account"]/span[@class="userCredits"]').text)
+                    new_balance = int(driver.find_element_by_xpath('//a[@href="/account"]/span[@class="userCredits"]').text)
+
+                    # calculate and print profit
+                    profit = new_balance - current_balance
+                    print("profit = ",profit)
+
+                    # write to log file
+                    profit_logfile = open(profit_fname, "a")
+                    profit_logfile.write(str(time.ctime(time.time()))+",\t"+str(new_balance)+",\t"+str(profit)+'\n')
+                    profit_logfile.close()
+
+                    #update current balance
+                    current_balance = new_balance
+
+                # close ads if found
+                if (len(driver.window_handles) > 1):
+                    print('\tad detected; closing')
+                    driver.switch_to.window(driver.window_handles[1])
+                    driver.close()
+                    driver.switch_to.window(driver.window_handles[0])
+
+
+                while bet_current > 0:
+                    time.sleep(2)
+                    print('\tupping bet')
+                    # click up the bet
+                    xp = '//*[@id="betSpinUp"]'
+                    driver.find_element_by_xpath(xp).click()# increase bet
+                    bet_current -= 1
+
+                # every now and then, wait a few minutes
+                if(random.randint(0,100)) == 0:
+                    fuzz = random.randint(60,180)
+                    print("\tsleeping for ",fuzz," seconds...")
+                    time.sleep(fuzz)
 
 
 
-        # every once in a while wait a couple hours
-        if (random.randint(0, 1500)) == 0:
-            fuzz = random.randint(3600*.5, 3600*2) # 1-2 hours
-            if (random.randint(0, 3)) == 0:
-                fuzz += random.uniform(3600* 5, 3600*7) # 1-2 hours
-            print("Taking break for ", fuzz / 3600, " hours...")
+                # every once in a while wait a couple hours
+                if (random.randint(0, 2000)) == 0:
+                    fuzz = random.randint(3600*.5, 3600*2) # 1-2 hours
+                    if (random.randint(0, 5)) == 0:
+                        fuzz += random.uniform(3600* 5, 3600*7) # 1-2 hours
+                    print("Taking break for ", fuzz / 3600, " hours...")
+                    driver.quit()
+                    time.sleep(fuzz)
+                    print("Resuming")
+                    break
+    except:
+        try:
+            print("restarting driver")
             driver.quit()
-            time.sleep(fuzz)
-            print("Resuming")
-            break
-
+        except:
+            print("Something's broken")
+            time.sleep(6000)
 
